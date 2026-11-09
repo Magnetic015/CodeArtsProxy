@@ -1,0 +1,46 @@
+# Private workspace records
+CLAUDE.md
+.claude/
+docs/
+.idea/
+.DS_Store
+
+# Secrets and runtime data
+.env
+.env.*
+config.yaml
+accounts.json
+secrets/
+credentials/
+cookies/
+state/
+logs/
+recon/
+userdata/
+session/
+proxy/
+*.cookie
+*.cookies
+*.log
+*.db
+*.db-*
+*.sqlite*
+
+# Python and test outputs
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Personal exports
+__article/
+*.docx
+*.doc
+*.xlsx
+*.csv
