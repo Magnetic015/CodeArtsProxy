@@ -1,0 +1,6 @@
+{
+  "accounts": [
+    {"name": "acct-a", "cookie_file": "/run/secrets/acct-a.cookie"},
+    {"name": "acct-b", "cookie_file": "/run/secrets/acct-b.cookie"}
+  ]
+}
