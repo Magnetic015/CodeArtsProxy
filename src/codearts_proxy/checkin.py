@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -14,6 +15,19 @@ if TYPE_CHECKING:
 _FINAL_STATUSES = {"CONFIRMED", "CONSUMED", "REDEEMED", "ALREADY_CLAIMED"}
 _CLAIMED_STATUSES = {"CLAIMED", "CLAIM_PENDING", "PENDING", "PROCESSING"}
 _UNKNOWN_PRINCIPAL_PREFIX = "unresolved:"
+
+
+def _upstream_idempotent_key(intent_key: str) -> str:
+    """Derive an upstream-safe idempotentKey from the internal intent key.
+
+    The ops/claim endpoint rejects ':' in idempotentKey with
+    ``{"error_code":"PROMPTCENTER.00000001","error_msg":"idempotentKey : 参数无效"}``
+    (HTTP 400). The intent key is colon-joined, so it must never be sent
+    verbatim. Keep the internal key untouched for the state machine, and
+    send a deterministic colon-free digest instead: stable across retries
+    of the same intent, distinct across accounts/days/campaigns.
+    """
+    return hashlib.sha256(intent_key.encode("utf-8")).hexdigest()
 
 
 async def business_success(payload: Any) -> bool:
@@ -400,7 +414,11 @@ class CheckinService:
                 service_day=service_day,
                 operation="claim",
                 path=f"{OPS_BASE}/claim",
-                body={"campaignId": campaign_id, "idempotentKey": key, "channel": "WEB"},
+                body={
+                    "campaignId": campaign_id,
+                    "idempotentKey": _upstream_idempotent_key(key),
+                    "channel": "WEB",
+                },
                 step="claim",
             )
         except _DispatchUncertain:

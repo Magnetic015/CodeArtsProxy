@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from codearts_proxy.checkin import _upstream_idempotent_key
 from codearts_proxy.config import AccountManager, Settings
 from codearts_proxy.service import AccountRouter, CheckinService
 from codearts_proxy.state import StateStore
@@ -257,6 +258,34 @@ async def test_successful_claim_uses_final_delivery_readback(tmp_path):
     assert [path.rsplit("/", 1)[-1] for path, _ in upstream.posts] == ["claim", "confirm"]
     assert upstream.delivery_calls == 3
     assert state.checkin_rows("a")[0]["status"] == "claimed_verified"
+    state.close()
+
+
+@pytest.mark.asyncio
+async def test_claim_idempotent_key_is_colon_free(tmp_path):
+    """Upstream ops/claim rejects ':' in idempotentKey with HTTP 400
+    PROMPTCENTER.00000001 "idempotentKey : 参数无效", so the internal
+    colon-joined intent key must never be sent verbatim."""
+    upstream = SequenceUpstream(
+        [
+            campaign(),
+            campaign(status="CLAIMED", claimable=False),
+            campaign(status="CONFIRMED", claimable=False),
+        ],
+        claim={"code": 0},
+        confirm={"code": 0},
+    )
+    service, state = make_sequence_service(tmp_path, upstream)
+    await service.run("a", "2026-11-10")
+
+    claim_bodies = [body for path, body in upstream.posts if path.endswith("/claim")]
+    assert claim_bodies, "expected a claim call"
+    key = claim_bodies[0]["idempotentKey"]
+    assert ":" not in key
+    # deterministic: deriving from the same intent key always yields the same value
+    assert _upstream_idempotent_key("x:y:claim:34") == _upstream_idempotent_key("x:y:claim:34")
+    # distinct across accounts/days/campaigns
+    assert _upstream_idempotent_key("x:y:claim:34") != _upstream_idempotent_key("x:y:claim:3")
     state.close()
 
 
